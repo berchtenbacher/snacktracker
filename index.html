@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Snack Tracker</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="data.js"></script>
+
+    <style>
+        body {
+            font-family: 'VT323', monospace;
+            background-color: #fef3c7; /* Amber-100 */
+            /* 90s Dotted Pattern */
+            background-image: radial-gradient(#d97706 1px, transparent 1px);
+            background-size: 20px 20px;
+            color: #1f2937;
+        }
+
+        /* HIDE NUMBER INPUT ARROWS (Spinners) */
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { 
+            -webkit-appearance: none; 
+            margin: 0; 
+        }
+        input[type=number] {
+            -moz-appearance: textfield; /* Firefox */
+        }
+
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #fef3c7; }
+        ::-webkit-scrollbar-thumb { background: #f59e0b; border: 2px solid #fef3c7; }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.95);
+            border: 3px solid #000;
+            box-shadow: 8px 8px 0px rgba(0,0,0,0.2);
+        }
+
+        .btn-pixel {
+            box-shadow: 2px 2px 0px #000;
+            transition: all 0.1s;
+        }
+        .btn-pixel:active {
+            transform: translate(2px, 2px);
+            box-shadow: 0px 0px 0px #000;
+        }
+
+        .progress-container {
+            border: 3px solid #000;
+            background: #e5e7eb;
+            height: 32px;
+            position: relative;
+        }
+        .progress-fill {
+            height: 100%;
+            background: #f59e0b; /* Amber-500 */
+            transition: width 0.3s ease;
+        }
+        .progress-text {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+            font-weight: bold;
+            color: #000;
+            text-shadow: 1px 1px 0 #fff;
+            z-index: 10;
+        }
+        .progress-fill.over { background: #ef4444; } 
+        
+        .cat-header {
+            font-family: sans-serif;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            background: #fff;
+            display: inline-block;
+            padding: 2px 6px;
+            border: 1px solid black;
+            margin-top: 1rem;
+            box-shadow: 2px 2px 0 rgba(0,0,0,0.1);
+        }
+
+        #sidebar {
+            transform: translateX(100%);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        #sidebar.open { transform: translateX(0); }
+    </style>
+</head>
+<body class="h-[100dvh] w-screen overflow-hidden text-xl relative" onclick="handleBodyClick(event)">
+
+    <div class="relative z-10 w-full h-full max-w-md mx-auto p-4 flex flex-col">
+        
+        <header class="flex justify-between items-center mb-6 pt-2">
+            <h1 class="text-4xl text-amber-700 leading-none" style="text-shadow: 2px 2px 0 #fff;">SNACK TRACKER</h1>
+            <button onclick="toggleSidebar()" class="btn-pixel bg-amber-400 text-black p-2 border-2 border-black hover:bg-amber-300">
+                <i data-lucide="menu" class="w-8 h-8"></i>
+            </button>
+        </header>
+
+        <main class="glass-panel flex-1 flex flex-col p-4 overflow-hidden relative">
+            
+            <div class="mb-6">
+                <div class="progress-container">
+                    <div id="prog-bar" class="progress-fill w-0"></div>
+                    <div id="prog-text" class="progress-text">0 / 0 kcal</div>
+                </div>
+            </div>
+
+            <div class="flex gap-2 mb-6 items-end">
+                <button onclick="cycleActiveIcon()" class="w-12 h-12 bg-white border-2 border-black flex-shrink-0 flex items-center justify-center btn-pixel">
+                    <img id="active-icon-preview" src="assets/snacks/placeholder.png" class="w-8 h-8 object-contain">
+                </button>
+                
+                <div class="flex-1 flex flex-col gap-1">
+                    <div class="flex gap-2">
+                        <input type="text" id="main-name" placeholder="Item Name" 
+                            class="flex-1 border-2 border-black p-1 pl-2 text-lg h-10 outline-none focus:bg-amber-50">
+                        <input type="number" id="main-cal" placeholder="kcal" 
+                            class="w-20 border-2 border-black p-1 text-center text-lg h-10 outline-none focus:bg-amber-50">
+                    </div>
+                </div>
+
+                <button onclick="addFromMain()" class="w-12 h-10 bg-green-400 border-2 border-black flex items-center justify-center btn-pixel hover:bg-green-300">
+                    <i data-lucide="plus" class="w-6 h-6 text-black"></i>
+                </button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto bg-amber-50 border-2 border-black p-2 shadow-inner">
+                <div id="log-list" class="space-y-1"></div>
+            </div>
+
+        </main>
+    </div>
+
+    <aside id="sidebar" class="absolute inset-y-0 right-0 w-full max-w-sm bg-white border-l-4 border-black z-50 flex flex-col shadow-2xl h-full">
+        
+        <div class="bg-amber-500 p-4 border-b-4 border-black flex justify-between items-center shrink-0">
+            <h2 class="text-2xl text-white drop-shadow-md">Menu</h2>
+            <button onclick="toggleSidebar()" class="text-white hover:text-amber-100">
+                <i data-lucide="x" class="w-8 h-8"></i>
+            </button>
+        </div>
+
+        <div class="flex-1 overflow-y-auto p-4 bg-amber-50">
+            
+            <div class="mb-6 border-b-2 border-gray-200 pb-4">
+                <label class="text-sm font-sans font-bold text-gray-500">DAILY BUDGET</label>
+                <div class="flex gap-2 mt-1">
+                    <input type="number" id="budget-input" class="border-2 border-black p-2 w-full text-xl" onchange="updateBudget()">
+                    <div class="p-2 flex items-center bg-gray-200 border-2 border-black">kcal</div>
+                </div>
+            </div>
+
+            <div class="mb-6 border-b-2 border-gray-200 pb-4">
+                <label class="text-sm font-sans font-bold text-gray-500 mb-2 block">ADD FAVORITE</label>
+                
+                <div class="flex gap-2 mb-2">
+                    <button onclick="cycleRepoIcon()" class="w-10 h-10 bg-white border-2 border-black shrink-0 flex items-center justify-center">
+                        <img id="repo-icon-preview" src="" class="w-6 h-6">
+                    </button>
+                    <input type="text" id="repo-name" placeholder="Name" class="flex-1 border-2 border-black px-2">
+                    <input type="number" id="repo-cal" placeholder="cal" class="w-16 border-2 border-black px-1 text-center">
+                </div>
+                
+                <div class="flex justify-between gap-1 mb-2" id="cat-buttons"></div>
+
+                <button onclick="addToRepo()" class="btn-pixel w-full bg-blue-400 border-2 border-black py-1 text-white hover:bg-blue-500">
+                    SAVE TO FAVORITES
+                </button>
+            </div>
+
+            <div class="mb-8">
+                <label class="text-sm font-sans font-bold text-gray-500 mb-1 block">QUICK ADD</label>
+                <div id="repo-list" class="space-y-3"></div>
+            </div>
+
+            <div>
+                <label class="text-sm font-sans font-bold text-gray-500 mb-1 block">HISTORY (14 Days)</label>
+                <div id="history-list" class="font-sans text-sm bg-white border-2 border-black p-2 space-y-1"></div>
+            </div>
+
+        </div>
+    </aside>
+
+    <div id="overlay" onclick="toggleSidebar()" class="fixed inset-0 bg-black/20 z-40 hidden backdrop-blur-sm"></div>
+
+    <script>
+        // --- Config ---
+        const CATEGORIES = ['Snack', 'Candy', 'Drink', 'Fruit', 'Misc'];
+        
+        let state = {
+            today: [],      // { id, name, kcal, iconUrl }
+            repo: [],       // { id, name, kcal, category, iconIndex }
+            history: [],    // { date, total, budget }
+            budget: 1500,
+            lastDate: new Date().toDateString()
+        };
+
+        let activeIconIndex = 0; 
+        let repoIconIndex = 0;   
+        let selectedRepoCat = 'Snack';
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadState();
+            checkNewDay();
+            renderAll();
+        });
+
+        function handleBodyClick(e) {}
+
+        function generateId() { return Date.now().toString(36) + Math.random().toString(36).substr(2); }
+
+        function saveState() {
+            localStorage.setItem('snackTracker_v2', JSON.stringify(state));
+            updateProgressBar();
+        }
+
+        function loadState() {
+            const saved = localStorage.getItem('snackTracker_v2');
+            if (saved) {
+                state = JSON.parse(saved);
+                document.getElementById('budget-input').value = state.budget;
+            } else {
+                document.getElementById('budget-input').value = 1500;
+            }
+        }
+
+        function checkNewDay() {
+            const current = new Date().toDateString();
+            if (state.lastDate !== current) {
+                const total = state.today.reduce((a,b)=>a+b.kcal,0);
+                if (state.today.length > 0) {
+                    state.history.unshift({ date: state.lastDate, total, budget: state.budget });
+                    if (state.history.length > 14) state.history.pop();
+                }
+                state.today = [];
+                state.lastDate = current;
+                saveState();
+            }
+        }
+
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('open');
+            document.getElementById('overlay').classList.toggle('hidden');
+        }
+
+        function updateBudget() {
+            const val = parseInt(document.getElementById('budget-input').value);
+            if (val > 0) { state.budget = val; saveState(); updateProgressBar(); }
+        }
+
+        function cycleActiveIcon() {
+            activeIconIndex++; updateIconPreviews();
+        }
+
+        function cycleRepoIcon() {
+            repoIconIndex++; updateIconPreviews();
+        }
+
+        function setRepoCat(cat) {
+            selectedRepoCat = cat; repoIconIndex = 0;
+            renderCatButtons(); updateIconPreviews();
+        }
+
+        function updateIconPreviews() {
+            const allCats = CATEGORIES; 
+            const flatIndex = activeIconIndex % (allCats.length * 3);
+            const cat = allCats[Math.floor(flatIndex / 3) % allCats.length];
+            const idx = flatIndex % 3;
+            document.getElementById('active-icon-preview').src = getIconUrl(cat, idx);
+            document.getElementById('repo-icon-preview').src = getIconUrl(selectedRepoCat, repoIconIndex);
+        }
+
+        function addFromMain() {
+            const nameIn = document.getElementById('main-name');
+            const calIn = document.getElementById('main-cal');
+            const name = nameIn.value.trim();
+            const kcal = parseInt(calIn.value);
+            
+            if (!name || isNaN(kcal)) return;
+
+            const iconUrl = document.getElementById('active-icon-preview').src;
+            state.today.push({ id: generateId(), name, kcal, iconUrl });
+
+            nameIn.value = ''; calIn.value = '';
+            saveState(); renderLog();
+        }
+
+        function removeLogItem(id) {
+            state.today = state.today.filter(i => i.id !== id);
+            saveState(); renderLog();
+        }
+
+        function addToRepo() {
+            const name = document.getElementById('repo-name').value.trim();
+            const kcal = parseInt(document.getElementById('repo-cal').value);
+            if (!name || isNaN(kcal)) return;
+
+            state.repo.push({
+                id: generateId(), name, kcal, category: selectedRepoCat, iconIndex: repoIconIndex
+            });
+
+            document.getElementById('repo-name').value = '';
+            document.getElementById('repo-cal').value = '';
+            saveState(); renderRepo();
+        }
+
+        // Feature: Add direct from Repo with (+) button
+        function addFromRepoDirect(id, e) {
+            e.stopPropagation(); // Stop bubbling so we don't trigger the "pre-fill" click
+            const item = state.repo.find(i => i.id === id);
+            if (!item) return;
+
+            state.today.push({
+                id: generateId(),
+                name: item.name,
+                kcal: item.kcal,
+                iconUrl: getIconUrl(item.category, item.iconIndex)
+            });
+            saveState();
+            renderLog();
+        }
+
+        // Feature: Pre-fill input if clicking the body of the item
+        function useRepoItem(id) {
+            const item = state.repo.find(i => i.id === id);
+            if (!item) return;
+
+            document.getElementById('main-name').value = item.name;
+            document.getElementById('main-cal').value = item.kcal;
+            document.getElementById('active-icon-preview').src = getIconUrl(item.category, item.iconIndex);
+            
+            toggleSidebar();
+        }
+
+        function deleteRepoItem(id, e) {
+            e.stopPropagation();
+            if(confirm("Delete favorite?")) {
+                state.repo = state.repo.filter(i => i.id !== id);
+                saveState(); renderRepo();
+            }
+        }
+
+        function renderAll() {
+            renderCatButtons(); updateIconPreviews(); updateProgressBar();
+            renderLog(); renderRepo(); renderHistory(); lucide.createIcons();
+        }
+
+        function renderCatButtons() {
+            const div = document.getElementById('cat-buttons');
+            div.innerHTML = CATEGORIES.map(cat => `
+                <button onclick="setRepoCat('${cat}')" 
+                    class="flex-1 text-[12px] border border-black uppercase ${selectedRepoCat === cat ? 'bg-amber-500 text-white' : 'bg-white hover:bg-gray-100'}">
+                    ${cat}
+                </button>
+            `).join('');
+        }
+
+        function updateProgressBar() {
+            const total = state.today.reduce((a,b)=>a+b.kcal,0);
+            const pct = Math.min((total / state.budget) * 100, 100);
+            
+            const bar = document.getElementById('prog-bar');
+            bar.style.width = pct + '%';
+            bar.className = 'progress-fill' + (total > state.budget ? ' over' : '');
+            
+            document.getElementById('prog-text').innerText = `${total} / ${state.budget} kcal`;
+        }
+
+        function renderLog() {
+            const list = document.getElementById('log-list');
+            if (state.today.length === 0) {
+                list.innerHTML = `<div class="text-center text-gray-400 mt-4">No snacks today.</div>`;
+                return;
+            }
+            list.innerHTML = state.today.map(item => `
+                <div class="flex items-center bg-white border border-black p-1 shadow-sm">
+                    <img src="${item.iconUrl}" class="w-8 h-8 mr-2 object-contain">
+                    <div class="flex-1 truncate text-lg">${item.name}</div>
+                    <div class="font-bold text-amber-600 mr-3 text-lg">${item.kcal}</div>
+                    <button onclick="removeLogItem('${item.id}')" class="text-red-400 hover:text-red-600">
+                        <i data-lucide="x" class="w-6 h-6"></i>
+                    </button>
+                </div>
+            `).join('');
+            lucide.createIcons();
+        }
+
+        function renderRepo() {
+            const list = document.getElementById('repo-list');
+            let html = '';
+            
+            CATEGORIES.forEach(cat => {
+                const items = state.repo.filter(i => i.category === cat);
+                if (items.length > 0) {
+                    html += `<div class="cat-header mb-1">${cat}</div>`;
+                    items.forEach(item => {
+                        const icon = getIconUrl(item.category, item.iconIndex);
+                        html += `
+                        <div onclick="useRepoItem('${item.id}')" class="cursor-pointer flex items-center bg-white border border-black p-1 mb-1 hover:bg-amber-50 group">
+                            <img src="${icon}" class="w-6 h-6 mr-2 object-contain">
+                            <div class="flex-1 text-lg leading-none">${item.name}</div>
+                            <div class="text-gray-500 text-sm mr-2">${item.kcal}</div>
+                            
+                            <button onclick="addFromRepoDirect('${item.id}', event)" class="mr-2 btn-pixel bg-green-100 p-1 border border-black hover:bg-green-200 text-green-700">
+                                <i data-lucide="plus" class="w-4 h-4"></i>
+                            </button>
+
+                            <button onclick="deleteRepoItem('${item.id}', event)" class="opacity-0 group-hover:opacity-100 text-red-500">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>
+                        </div>`;
+                    });
+                }
+            });
+            list.innerHTML = html || '<div class="text-sm text-gray-400">No favorites saved.</div>';
+            lucide.createIcons();
+        }
+
+        function renderHistory() {
+            const list = document.getElementById('history-list');
+            if (state.history.length === 0) {
+                list.innerText = "No history available.";
+                return;
+            }
+            list.innerHTML = state.history.map(d => `
+                <div class="flex justify-between border-b border-gray-100 last:border-0">
+                    <span>${d.date.substring(0,10)}</span>
+                    <span class="${d.total > d.budget ? 'text-red-500' : 'text-green-600'} font-bold">
+                        ${d.total}
+                    </span>
+                </div>
+            `).join('');
+        }
+    </script>
+</body>
+</html>
